@@ -1,0 +1,13 @@
+[package]
+name = "sequence_align"
+version = "0.1.0"
+edition = "2021"
+license-file = "LICENSE"
+
+[dependencies]
+lib = { path = "lib" }
+
+[workspace]
+members = ["lib"]
+default-members = ["lib"]
+resolver = "2"
