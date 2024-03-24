@@ -31,9 +31,27 @@ pub fn needleman_wunsch(
     indel_score: f64,
     gap_val: i64,
 ) -> PyResult<(Vec<i64>, Vec<i64>)> {
+    needleman_wunsch_inner(
+        seq_one,
+        seq_two,
+        match_score,
+        mismatch_score,
+        indel_score,
+        gap_val,
+    ).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
+pub fn needleman_wunsch_inner(
+    seq_one: Vec<i64>,
+    seq_two: Vec<i64>,
+    match_score: f64,
+    mismatch_score: f64,
+    indel_score: f64,
+    gap_val: i64,
+) -> anyhow::Result<(Vec<i64>, Vec<i64>)> {
     // Invariant -- gap_val cannot be in either sequence
     if (seq_one.contains(&gap_val)) || (seq_two.contains(&gap_val)) {
-        return Err(PyValueError::new_err(
+        return Err(anyhow::anyhow!(
             "Gap value {gap_val} cannot be present in either sequence",
         ));
     }
@@ -318,9 +336,27 @@ pub fn hirschberg(
     indel_score: f64,
     gap_val: i64,
 ) -> PyResult<(Vec<i64>, Vec<i64>)> {
+    hirschberg_inner(
+        seq_one,
+        seq_two,
+        match_score,
+        mismatch_score,
+        indel_score,
+        gap_val,
+    ).map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
+pub fn hirschberg_inner(
+    seq_one: Vec<i64>,
+    seq_two: Vec<i64>,
+    match_score: f64,
+    mismatch_score: f64,
+    indel_score: f64,
+    gap_val: i64,
+) -> anyhow::Result<(Vec<i64>, Vec<i64>)> {
     // Invariant -- gap_val cannot be in either sequence
     if (seq_one.contains(&gap_val)) || (seq_two.contains(&gap_val)) {
-        return Err(PyValueError::new_err(
+        return Err(anyhow::anyhow!(
             "Gap value {gap_val} cannot be present in either sequence",
         ));
     }
@@ -329,7 +365,7 @@ pub fn hirschberg(
     let seq_two_len = seq_two.len();
     if (seq_one_len <= 1) || (seq_two_len <= 1) {
         // Already efficient for these dimensions
-        return needleman_wunsch(
+        return needleman_wunsch_inner(
             seq_one,
             seq_two,
             match_score,
