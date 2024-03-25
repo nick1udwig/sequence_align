@@ -2,6 +2,9 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::cmp;
+use std::collections::HashSet;
+
+const GAP_VAL: i64 = -1;
 
 /// Computes an optimal global pairwise alignment between two sequences of integers using the
 /// Needleman-Wunsch algorithm and returns the corresponding aligned sequences, with any gaps
@@ -41,7 +44,31 @@ pub fn needleman_wunsch(
     ).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-pub fn needleman_wunsch_inner(
+pub fn needleman_wunsch_rust(
+    seq_one: Vec<&str>,
+    seq_two: Vec<&str>,
+    match_score: f64,
+    mismatch_score: f64,
+    indel_score: f64,
+    gap: &str,
+) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+    let (idx2symbol, seq_a_indices, seq_b_indices) = entry2idx(
+        &seq_one, &seq_two, gap,
+    )?;
+
+    let (seq_a_indices_aligned, seq_b_indices_aligned) = needleman_wunsch_inner(
+        seq_a_indices,
+        seq_b_indices,
+        match_score,
+        mismatch_score,
+        indel_score,
+        GAP_VAL,
+    )?;
+
+    Ok(idx2entry(&idx2symbol, &seq_a_indices_aligned, &seq_b_indices_aligned, gap, GAP_VAL))
+}
+
+fn needleman_wunsch_inner(
     seq_one: Vec<i64>,
     seq_two: Vec<i64>,
     match_score: f64,
@@ -346,7 +373,31 @@ pub fn hirschberg(
     ).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-pub fn hirschberg_inner(
+pub fn hirschberg_rust(
+    seq_one: Vec<&str>,
+    seq_two: Vec<&str>,
+    match_score: f64,
+    mismatch_score: f64,
+    indel_score: f64,
+    gap: &str,
+) -> anyhow::Result<(Vec<String>, Vec<String>)> {
+    let (idx2symbol, seq_a_indices, seq_b_indices) = entry2idx(
+        &seq_one, &seq_two, gap,
+    )?;
+
+    let (seq_a_indices_aligned, seq_b_indices_aligned) = hirschberg_inner(
+        seq_a_indices,
+        seq_b_indices,
+        match_score,
+        mismatch_score,
+        indel_score,
+        GAP_VAL,
+    )?;
+
+    Ok(idx2entry(&idx2symbol, &seq_a_indices_aligned, &seq_b_indices_aligned, gap, GAP_VAL))
+}
+
+fn hirschberg_inner(
     seq_one: Vec<i64>,
     seq_two: Vec<i64>,
     match_score: f64,
@@ -467,3 +518,82 @@ fn _sequence_align(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(hirschberg, m)?)?;
     Ok(())
 }
+
+// Assuming _GAP_VAL is defined elsewhere as a constant.
+// For example: const _GAP_VAL: usize = usize::MAX;
+// Adjust according to your actual gap value and usage context.
+
+/// Maps entries of two sequences to unique indices, excluding a specific gap symbol.
+///
+/// # Arguments
+///
+/// * `seq_a` - A sequence of symbols.
+/// * `seq_b` - Another sequence of symbols.
+/// * `gap` - The gap symbol that should not appear in either sequence.
+///
+/// # Returns
+///
+/// A tuple containing a vector of unique symbols, and two vectors representing the
+/// indices of the symbols in `seq_a` and `seq_b`, respectively.
+///
+/// # Errors
+///
+/// Returns an error if the gap symbol is found in either of the sequences.
+fn entry2idx(
+    seq_a: &[&str],
+    seq_b: &[&str],
+    gap: &str,
+) -> anyhow::Result<(Vec<String>, Vec<i64>, Vec<i64>)> {
+    let mut unique_symbols: HashSet<String> = seq_a.iter().map(|s| s.to_string()).collect();
+    unique_symbols.extend(seq_b.iter().map(|s| s.to_string()));
+
+    if unique_symbols.contains(gap) {
+        return Err(anyhow::anyhow!("Gap entry {:?} found in seq_a and/or seq_b; must not exist in either", gap));
+    }
+
+    let idx2symbol: Vec<String> = unique_symbols.into_iter().collect();
+    let symbol2idx: std::collections::HashMap<String, i64> = idx2symbol
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(idx, symbol)| (symbol, idx as i64))
+        .collect();
+
+    let seq_a_indices = seq_a.iter().map(|symbol| *symbol2idx.get(&symbol.to_string()).unwrap()).collect();
+    let seq_b_indices = seq_b.iter().map(|symbol| *symbol2idx.get(&symbol.to_string()).unwrap()).collect();
+
+    Ok((idx2symbol, seq_a_indices, seq_b_indices))
+}
+
+/// Converts arrays of indices back into sequences of symbols.
+///
+/// # Arguments
+///
+/// * `idx2symbol` - A vector mapping indices to symbols.
+/// * `seq_a_indices_aligned` - Indices representing an aligned sequence.
+/// * `seq_b_indices_aligned` - Indices representing another aligned sequence.
+/// * `gap` - The gap symbol.
+/// * `_gap_val` - The special value representing a gap in the sequences.
+///
+/// # Returns
+///
+/// A tuple containing two vectors representing the sequences reconstructed from the indices.
+fn idx2entry(
+    idx2symbol: &[String],
+    seq_a_indices_aligned: &[i64],
+    seq_b_indices_aligned: &[i64],
+    gap: &str,
+    gap_val: i64,
+) -> (Vec<String>, Vec<String>) {
+    let seq_a_aligned: Vec<String> = seq_a_indices_aligned
+        .iter()
+        .map(|&idx| if idx == gap_val { gap.to_string() } else { idx2symbol[idx as usize].to_string() })
+        .collect();
+    let seq_b_aligned: Vec<String> = seq_b_indices_aligned
+        .iter()
+        .map(|&idx| if idx == gap_val { gap.to_string() } else { idx2symbol[idx as usize].to_string() })
+        .collect();
+
+    (seq_a_aligned, seq_b_aligned)
+}
+

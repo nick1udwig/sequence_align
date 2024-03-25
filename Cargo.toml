@@ -1,13 +1,13 @@
 [package]
-name = "sequence_align"
+name = "sequence_align_rs"
 version = "0.1.0"
 edition = "2021"
 license-file = "LICENSE"
 
 [dependencies]
-lib = { path = "lib" }
-
-[workspace]
-members = ["lib"]
-default-members = ["lib"]
-resolver = "2"
+sequence_align = { path = "rust" }
+#
+#[workspace]
+#members = ["sequence_align"]
+#default-members = ["sequence_align"]
+#resolver = "2"
